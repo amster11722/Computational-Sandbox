@@ -11,7 +11,7 @@ public abstract class Simulation
     {
         // Basic initialization
         Raylib.InitWindow(width, height, title);
-        Raylib.SetTargetFPS(60);
+        Raylib.SetTargetFPS(144);
 
         Initialize();
 
