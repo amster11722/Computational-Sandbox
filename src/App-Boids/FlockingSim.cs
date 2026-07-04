@@ -9,12 +9,10 @@ public class FlockingSim : Simulation
     const int MaximumBoidSpeed = 250;
     const int MaximumSteeringForce = 200;
 
-    const int screenWidth = 1700;
-    const int screenHeight = 900;
-
-    // Spatial grid references
-    int totalRows = (int)MathF.Ceiling(screenWidth / BoidPerceptionRadius);
-    int totalColumns = (int)MathF.Ceiling(screenHeight / BoidPerceptionRadius);
+    int screenWidth = 500;
+    int screenHeight = 500;
+    int totalRows;
+    int totalColumns;
 
     // Variables
     float alignmentWeight = 2;
@@ -28,6 +26,7 @@ public class FlockingSim : Simulation
         public Vector2 position;
         public Vector2 velocity;
         public int neighbors;
+        public Queue<Vector2> history = new Queue<Vector2>();
 
         public Boid(int x, int y, Vector2 vel)
         {
@@ -49,11 +48,21 @@ public class FlockingSim : Simulation
     {
         // Set up window
         FlockingSim flockingSim = new FlockingSim();
-        flockingSim.Run(screenWidth, screenHeight, "Flocking Simulation");
+        flockingSim.Run(500, 500, "Flocking Simulation");
     }
 
     protected override void Initialize()
     {
+        // Set fullscreen
+        int monitor = Raylib.GetCurrentMonitor();
+        screenWidth = Raylib.GetMonitorWidth(monitor);
+        screenHeight = Raylib.GetMonitorHeight(monitor);
+        totalRows = (int)MathF.Ceiling((float)screenWidth / BoidPerceptionRadius);
+        totalColumns = (int)MathF.Ceiling((float)screenHeight / BoidPerceptionRadius);
+
+        Raylib.SetWindowSize(screenWidth, screenHeight);
+        Raylib.ToggleFullscreen();
+
         // Init boids
         boids = new List<Boid>();
         for (int i = 0; i < 5000; i++)
@@ -206,7 +215,7 @@ public class FlockingSim : Simulation
 
     protected override void Draw()
     {
-        Raylib.DrawRectangle(0, 0, screenWidth, screenHeight, new Color(20, 20, 20, 60));
+        Raylib.DrawRectangle(0, 0, screenWidth, screenHeight, new Color(20, 20, 20, 30));
         foreach (Boid boid in boids)
         {
             // Boid triangular shape
