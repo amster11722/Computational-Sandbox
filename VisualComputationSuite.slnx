@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Core/Core.csproj" />
+    <Project Path="src/SuiteApp/SuiteApp.csproj" />
+  </Folder>
+</Solution>
