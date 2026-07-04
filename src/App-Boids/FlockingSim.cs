@@ -27,11 +27,13 @@ public class FlockingSim : Simulation
     {
         public Vector2 position;
         public Vector2 velocity;
+        public int neighbors;
 
         public Boid(int x, int y, Vector2 vel)
         {
             position = new Vector2(x, y);
             velocity = vel;
+            neighbors = 0;
         }
     }
 
@@ -93,8 +95,8 @@ public class FlockingSim : Simulation
             Vector2 totalVelocity = Vector2.Zero;
             Vector2 totalPositions = Vector2.Zero;
             Vector2 escapeDirection = Vector2.Zero;
-            int neighbors = 0;
             Boid boid = boids[i];
+            boid.neighbors = 0;
 
             // Find neighbors in perception range via spatial grid and collect values
             for (int xOffset = -1; xOffset <= 1; xOffset++)
@@ -120,7 +122,7 @@ public class FlockingSim : Simulation
                                     float dist = Vector2.Distance(other.position, boid.position);
                                     if (dist < BoidPerceptionRadius)
                                     {
-                                        neighbors++;
+                                        boid.neighbors++;
                                         totalVelocity += other.velocity;
                                         totalPositions += other.position;
                                         Vector2 diff = boid.position - other.position;
@@ -157,6 +159,8 @@ public class FlockingSim : Simulation
                 // Forcefully snap 20% of their velocity toward the escape vector instantly this frame
                 boid.velocity = Vector2.Lerp(boid.velocity, escape, 0.2f);
             }
+
+            int neighbors = boid.neighbors;
 
             if (neighbors > 0)
             {
@@ -202,7 +206,7 @@ public class FlockingSim : Simulation
 
     protected override void Draw()
     {
-        Raylib.ClearBackground(new Color(20, 20, 20, 255));
+        Raylib.DrawRectangle(0, 0, screenWidth, screenHeight, new Color(20, 20, 20, 60));
         foreach (Boid boid in boids)
         {
             // Boid triangular shape
@@ -215,7 +219,11 @@ public class FlockingSim : Simulation
             vert2 = new Vector2(vert2.X * MathF.Cos(angle) - vert2.Y * MathF.Sin(angle), vert2.X * MathF.Sin(angle) + vert2.Y * MathF.Cos(angle)) + boid.position;
             vert3 = new Vector2(vert3.X * MathF.Cos(angle) - vert3.Y * MathF.Sin(angle), vert3.X * MathF.Sin(angle) + vert3.Y * MathF.Cos(angle)) + boid.position;
             // Draw the boid
-            Raylib.DrawTriangle(vert1, vert2, vert3, Color.White);
+            byte r = (byte)((boid.velocity.X / MaximumBoidSpeed) * 127 + 128);
+            byte g = (byte)((boid.velocity.Y / MaximumBoidSpeed) * 127 + 128);
+            byte b = 200;
+            byte alpha = (byte)Math.Clamp(50 + (boid.neighbors * 15), 50, 255);
+            Raylib.DrawTriangle(vert1, vert2, vert3, new Color(r, g, b, alpha));
         }
         Raylib.DrawFPS(10, 10);
     }
