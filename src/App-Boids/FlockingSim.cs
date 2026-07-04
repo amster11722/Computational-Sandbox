@@ -34,7 +34,7 @@ public class FlockingSim : Simulation
         Random rng = new Random();
         for (int i = 0; i < 100; i++)
         {
-            boids.Add(new Boid(rng.Next(0, 800), rng.Next(0, 500), new Vector2(rng.Next(0, 300), rng.Next(0, 300))));
+            boids.Add(new Boid(rng.Next(0, 800), rng.Next(0, 500), new Vector2(rng.Next(-300, 300), rng.Next(-300, 300))));
         }
     }
 
@@ -57,7 +57,17 @@ public class FlockingSim : Simulation
         Raylib.ClearBackground(new Color(20, 20, 20, 255));
         foreach (Boid boid in boids)
         {
-            Raylib.DrawTriangle(new Vector2(boid.position.X, boid.position.Y), new Vector2(boid.position.X - 5, boid.position.Y + 10), new Vector2(boid.position.X + 5, boid.position.Y + 10), Color.White);
+            // Boid triangular shape
+            Vector2 vert1 = new Vector2(boid.position.X, boid.position.Y) - boid.position;
+            Vector2 vert2 = new Vector2(boid.position.X - 5, boid.position.Y + 15) - boid.position;
+            Vector2 vert3 = new Vector2(boid.position.X + 5, boid.position.Y + 15) - boid.position;
+            // Rotation logic
+            float angle = MathF.Atan2(boid.velocity.Y, boid.velocity.X) + MathF.PI/2;
+            vert1 = new Vector2(vert1.X * MathF.Cos(angle) - vert1.Y * MathF.Sin(angle), vert1.X * MathF.Sin(angle) + vert1.Y * MathF.Cos(angle)) + boid.position;
+            vert2 = new Vector2(vert2.X * MathF.Cos(angle) - vert2.Y * MathF.Sin(angle), vert2.X * MathF.Sin(angle) + vert2.Y * MathF.Cos(angle)) + boid.position;
+            vert3 = new Vector2(vert3.X * MathF.Cos(angle) - vert3.Y * MathF.Sin(angle), vert3.X * MathF.Sin(angle) + vert3.Y * MathF.Cos(angle)) + boid.position;
+            // Draw the boid
+            Raylib.DrawTriangle(vert1, vert2, vert3, Color.White);
         }
     }
 }
