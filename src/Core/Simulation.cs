@@ -18,27 +18,18 @@ public abstract class Simulation
         // Draw loop
         while (!Raylib.WindowShouldClose())
         {
-            Update(Raylib.GetFrameTime()); // deltatime
+            // Runs data-based updates, passing in deltaTime
+            Update(Raylib.GetFrameTime());
             Raylib.BeginDrawing();
+            // Runs visual-based updates
             Draw();
-            Raylib.DrawFPS(10, 10);
             Raylib.EndDrawing();
         }
 
         Raylib.CloseWindow();
     }
 
-    // Basic initialization
-    protected virtual void Initialize()
-    {
-        Console.WriteLine("Initializing...");
-    }
-
-    // Runs every frame, framerate independent via deltaTime
-    protected virtual void Update(float deltaTime)
-    {
-    }
-
-    // Overrideable class to render with
+    protected virtual void Initialize() {}
+    protected virtual void Update(float deltaTime) {}
     protected abstract void Draw();
 }
