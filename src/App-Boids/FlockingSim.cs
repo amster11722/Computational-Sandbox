@@ -13,6 +13,7 @@ public class FlockingSim : Simulation
     int screenHeight = 500;
     int totalRows;
     int totalColumns;
+    float steerAngle = 0;
 
     // Variables
     float alignmentWeight = 2;
@@ -196,6 +197,10 @@ public class FlockingSim : Simulation
             // Steer the boid
             if (steering.Length() > MaximumSteeringForce)
                 steering = Vector2.Normalize(steering) * MaximumSteeringForce;
+            if (Raylib.IsMouseButtonDown(MouseButton.Right))
+            {
+                steering += new Vector2(MathF.Cos(steerAngle), MathF.Sin(steerAngle)) * 1000;
+            }
             boid.velocity += steering * deltaTime;
             if (boid.velocity.Length() > MaximumBoidSpeed)
             {
@@ -210,6 +215,10 @@ public class FlockingSim : Simulation
             if (boid.position.X > screenWidth) boid.position.X = 1;
             if (boid.position.Y < 0) boid.position.Y = screenHeight - 1;
             if (boid.position.Y > screenHeight) boid.position.Y = 1;
+        }
+        if (Raylib.IsMouseButtonDown(MouseButton.Right))
+        {
+            steerAngle += 3.0f * deltaTime; // Smoothly rotates 3 radians per second
         }
     }
 
@@ -234,6 +243,6 @@ public class FlockingSim : Simulation
             byte alpha = (byte)Math.Clamp(50 + (boid.neighbors * 15), 50, 255);
             Raylib.DrawTriangle(vert1, vert2, vert3, new Color(r, g, b, alpha));
         }
-        Raylib.DrawFPS(10, 10);
+        // Raylib.DrawFPS(10, 10);
     }
 }
