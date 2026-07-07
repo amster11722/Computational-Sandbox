@@ -74,7 +74,7 @@ public class ClothSim : Simulation
 
     protected override void Update(float deltaTime)
     {
-        int a = 300; // gravity
+        int a = 600; // gravity
 
         // Apply verlet integration
         for (int i = 0; i < particles.Count; i++)
@@ -93,6 +93,32 @@ public class ClothSim : Simulation
         {
             correctConstraints();
         }
+
+        // Cloth cutting
+        Vector2 mousePos = Raylib.GetMousePosition();
+        if (Raylib.IsMouseButtonDown(MouseButton.Left))
+        {
+            foreach (Connection connection in connections)
+            {
+                Vector2 r = connection.B.position - connection.A.position;
+                Vector2 s = mousePos - prevMousePos;
+                float denom = r.X * s.Y - r.Y * s.X;
+                if (denom != 0)
+                {
+                    float numT = (prevMousePos.X - connection.A.position.X) * s.Y - (prevMousePos.Y - connection.A.position.Y) * s.X;
+                    float numU = (prevMousePos.X - connection.A.position.X) * r.Y - (prevMousePos.Y - connection.A.position.Y) * r.X;
+
+                    float t = numT / denom;
+                    float u = numU / denom;
+
+                    if (t >= 0 && t <= 1 && u >= 0 && u <= 1)
+                    {
+                        connection.isActive = false;
+                    }
+                }
+            }
+        }
+        prevMousePos = mousePos;
     }
 
     public void correctConstraints()
@@ -129,7 +155,8 @@ public class ClothSim : Simulation
 
         foreach (Connection connection in connections)
         {
-            Raylib.DrawLine((int)connection.A.position.X, (int)connection.A.position.Y, (int)connection.B.position.X, (int)connection.B.position.Y, Color.White);
+            if(connection.isActive)
+                Raylib.DrawLine((int)connection.A.position.X, (int)connection.A.position.Y, (int)connection.B.position.X, (int)connection.B.position.Y, Color.White);
         }
     }
 }
