@@ -8,11 +8,16 @@ public class ClothSim : Simulation
     int screenHeight = 500;
     Vector2 prevMousePos;
 
+    int clothWidth = 500;
+    int clothRes = 40;
+
     public class Particle
     {
         public Vector2 position;
         public Vector2 prevPosition;
         public bool pinned;
+        public Connection Right;
+        public Connection Down;
 
         public Particle(float x, float y, bool pin)
         {
@@ -59,15 +64,29 @@ public class ClothSim : Simulation
 
         // Initiliaze particles and connections
 
-        for (int i = 0; i < 20; i++)
+        for (int i = 0; i < clothRes; i++)
         {
-            for (int j = 0; j < 20; j++)
+            for (int j = 0; j < clothRes; j++)
             {
-                particles.Add(new Particle(i * 30 + 700, j * 30 + 50, j == 0));
+                particles.Add(new Particle(i * (clothWidth / clothRes) + 700, j * (clothWidth / clothRes) + 50, j == 0));
                 if (j > 0)
-                    connections.Add(new Connection(particles[particles.Count - 1], particles[particles.Count - 2], 30));
+                {
+                    Particle topParticle = particles[particles.Count - 2];
+                    Particle bottomParticle = particles[particles.Count - 1];
+                    Connection newConn = new Connection(topParticle, bottomParticle, clothWidth / clothRes);
+
+                    connections.Add(newConn);
+                    topParticle.Down = newConn;
+                }
                 if (i > 0)
-                    connections.Add(new Connection(particles[particles.Count - 1], particles[particles.Count - 21], 30));
+                {
+                    Particle leftParticle = particles[particles.Count - 1 - clothRes];
+                    Particle rightParticle = particles[particles.Count - 1];
+                    Connection newConn = new Connection(leftParticle, rightParticle, clothWidth / clothRes);
+
+                    connections.Add(newConn);
+                    leftParticle.Right = newConn;
+                }
             }
         }
     }
@@ -89,7 +108,7 @@ public class ClothSim : Simulation
         }
 
         // Apply connection contraints via multi-stage relaxation
-        for (int i = 0; i < 6; i++)
+        for (int i = 0; i < 12; i++)
         {
             correctConstraints();
         }
@@ -148,15 +167,55 @@ public class ClothSim : Simulation
     {
         Raylib.ClearBackground(new Color(20, 20, 15, 255));
 
-        foreach (Particle particle in particles)
+        // Draw mesh sheet rather than individual particles
+        for (int i = 0; i < clothRes - 1; i++)
         {
-            Raylib.DrawCircle((int)particle.position.X, (int)particle.position.Y, 10, Color.White);
+            for (int j = 0; j < clothRes - 1; j++)
+            {
+                Particle TL = particles[i * clothRes + j];
+                Particle TR = particles[(i + 1) * clothRes + j];
+                Particle BL = particles[i * clothRes + j + 1];
+                Particle BR = particles[(i + 1) * clothRes + j + 1];
+
+                bool topEdgeActive = TL.Right != null && TL.Right.isActive;
+                bool leftEdgeActive = TL.Down != null && TL.Down.isActive;
+                bool rightEdgeActive = TR.Down != null && TR.Down.isActive;
+                bool bottomEdgeActive = BL.Right != null && BL.Right.isActive;
+
+                // Only draw the first triangle if the top and right boundaries are intact
+                if (topEdgeActive && rightEdgeActive)
+                {
+                    float BRSpeed = (BR.position - BR.prevPosition).Length();
+                    float TRSpeed = (TR.position - TR.prevPosition).Length();
+                    float TLSpeed = (TL.position - TL.prevPosition).Length();
+                    Color color = new Color(BRSpeed, TRSpeed, TLSpeed, 255);
+                    Raylib.DrawTriangle(BR.position, TR.position, TL.position, color);
+                    Raylib.DrawTriangle(TL.position, TR.position, BR.position, color);
+                }
+
+                // Only draw the second triangle if the bottom and left boundaries are intact
+                if (bottomEdgeActive && leftEdgeActive)
+                {
+                    float BRSpeed = (BR.position - BR.prevPosition).Length();
+                    float BLSpeed = (BL.position - BL.prevPosition).Length();
+                    float TLSpeed = (TL.position - TL.prevPosition).Length();
+                    Color color = new Color(BRSpeed, BLSpeed, TLSpeed, 255);
+                    Raylib.DrawTriangle(TL.position, BL.position, BR.position, color);
+                    Raylib.DrawTriangle(BR.position, BL.position, TL.position, color);
+                }
+            }
         }
 
-        foreach (Connection connection in connections)
-        {
-            if(connection.isActive)
-                Raylib.DrawLine((int)connection.A.position.X, (int)connection.A.position.Y, (int)connection.B.position.X, (int)connection.B.position.Y, Color.White);
-        }
+        // foreach (Particle particle in particles)
+        // {
+        //     Raylib.DrawCircle((int)particle.position.X, (int)particle.position.Y, 10, Color.White);
+
+        // }
+
+        // foreach (Connection connection in connections)
+        // {
+        //     if (connection.isActive)
+        //         Raylib.DrawLine((int)connection.A.position.X, (int)connection.A.position.Y, (int)connection.B.position.X, (int)connection.B.position.Y, Color.White);
+        // }
     }
 }
