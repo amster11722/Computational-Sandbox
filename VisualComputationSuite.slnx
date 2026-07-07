@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/App-Boids/App-Boids.csproj" />
+    <Project Path="src/App-VerletCloth/App-VerletCloth.csproj" />
     <Project Path="src/Core/Core.csproj" />
     <Project Path="src/SuiteApp/SuiteApp.csproj" />
   </Folder>
