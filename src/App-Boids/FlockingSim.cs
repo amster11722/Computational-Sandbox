@@ -245,4 +245,9 @@ public class FlockingSim : Simulation
         }
         // Raylib.DrawFPS(10, 10);
     }
+
+    protected override string AddDebugData()
+    {
+        return "Entities: " + boids.Count;
+    }
 }
