@@ -1,8 +1,10 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/App-Boids/App-Boids.csproj" />
+    <Project Path="src/App-SlimeMold/App-SlimeMold.csproj" />
     <Project Path="src/App-VerletCloth/App-VerletCloth.csproj" />
     <Project Path="src/Core/Core.csproj" />
+    <Project Path="src/SlimeSim/SlimeSim.csproj" />
     <Project Path="src/SuiteApp/SuiteApp.csproj" />
   </Folder>
 </Solution>

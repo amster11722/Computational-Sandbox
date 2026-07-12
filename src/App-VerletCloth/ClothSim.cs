@@ -18,8 +18,8 @@ public class ClothSim : Simulation
         public Vector2 position;
         public Vector2 prevPosition;
         public bool pinned;
-        public Connection Right;
-        public Connection Down;
+        public Connection? Right;
+        public Connection? Down;
 
         public Particle(float x, float y, bool pin)
         {
@@ -292,5 +292,10 @@ public class ClothSim : Simulation
                 }
             }
         }
+    }
+
+    protected override string AddDebugData()
+    {
+        return "";
     }
 }

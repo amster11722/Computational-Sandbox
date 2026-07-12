@@ -37,11 +37,12 @@ public abstract class Simulation
             }
             Raylib.EndDrawing();
         }
-
+        Deinitialize();
         Raylib.CloseWindow();
     }
 
     protected virtual void Initialize() { }
+    protected virtual void Deinitialize() { }
     protected virtual void Update(float deltaTime) { }
     protected abstract void Draw();
     protected abstract string AddDebugData();

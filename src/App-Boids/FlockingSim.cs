@@ -38,7 +38,7 @@ public class FlockingSim : Simulation
     }
 
     // List containing all current boid entities
-    List<Boid> boids;
+    List<Boid> boids = new List<Boid>();
 
     // Hash grid allocation dictionary for boids
     Dictionary<int, List<Boid>> spatialGrid = new Dictionary<int, List<Boid>>();
@@ -65,7 +65,6 @@ public class FlockingSim : Simulation
         Raylib.ToggleFullscreen();
 
         // Init boids
-        boids = new List<Boid>();
         for (int i = 0; i < 5000; i++)
         {
             boids.Add(new Boid(random.Next(0, screenWidth), random.Next(0, screenHeight), new Vector2(random.Next(-300, 300), random.Next(-300, 300))));
@@ -243,7 +242,6 @@ public class FlockingSim : Simulation
             byte alpha = (byte)Math.Clamp(50 + (boid.neighbors * 15), 50, 255);
             Raylib.DrawTriangle(vert1, vert2, vert3, new Color(r, g, b, alpha));
         }
-        // Raylib.DrawFPS(10, 10);
     }
 
     protected override string AddDebugData()
