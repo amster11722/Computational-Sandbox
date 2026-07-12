@@ -4,10 +4,6 @@ using Raylib_cs;
 
 public class FlockingSim : Simulation
 {
-    // Constants
-    const int BoidPerceptionRadius = 40;
-    const int MaximumBoidSpeed = 250;
-    const int MaximumSteeringForce = 200;
 
     int screenWidth = 500;
     int screenHeight = 500;
@@ -20,6 +16,30 @@ public class FlockingSim : Simulation
     float cohesionWeight = 1f;
     float separationWeight = 1.8f;
     float wanderingWeight = 150f;
+    float boidPerceptionRadius = 40;
+    float maximumBoidSpeed = 250;
+    float maximumSteeringForce = 200;
+
+    public enum Preset { Custom, Birds, Ocean, Null }
+
+    Preset currentPreset = Preset.Birds;
+
+    void ApplyPreset(Preset preset)
+    {
+        if(preset == Preset.Custom || preset == Preset.Null) return;
+        currentPreset = preset;
+        switch (preset)
+        {
+            case Preset.Custom:
+                break;
+            case Preset.Birds:
+                alignmentWeight = 2; cohesionWeight = 1; separationWeight = 1.8f; boidPerceptionRadius = 40; maximumBoidSpeed = 250; maximumSteeringForce = 200;
+                break;
+            case Preset.Ocean:
+                alignmentWeight = 0.3f; cohesionWeight = 1.5f; separationWeight = 1.9f; boidPerceptionRadius = 40; maximumBoidSpeed = 250; maximumSteeringForce = 200;
+                break;
+        }
+    }
 
     // Basic boid class for a single entity
     class Boid
@@ -58,8 +78,8 @@ public class FlockingSim : Simulation
         int monitor = Raylib.GetCurrentMonitor();
         screenWidth = Raylib.GetMonitorWidth(monitor);
         screenHeight = Raylib.GetMonitorHeight(monitor);
-        totalRows = (int)MathF.Ceiling((float)screenWidth / BoidPerceptionRadius);
-        totalColumns = (int)MathF.Ceiling((float)screenHeight / BoidPerceptionRadius);
+        totalRows = (int)MathF.Ceiling((float)screenWidth / boidPerceptionRadius);
+        totalColumns = (int)MathF.Ceiling((float)screenHeight / boidPerceptionRadius);
 
         Raylib.SetWindowSize(screenWidth, screenHeight);
         Raylib.ToggleFullscreen();
@@ -91,8 +111,8 @@ public class FlockingSim : Simulation
         for (int i = 0; i < boids.Count; i++)
         {
             // Place boids into their proper grid
-            int cellX = (int)(boids[i].position.X / BoidPerceptionRadius);
-            int cellY = (int)(boids[i].position.Y / BoidPerceptionRadius);
+            int cellX = (int)(boids[i].position.X / boidPerceptionRadius);
+            int cellY = (int)(boids[i].position.Y / boidPerceptionRadius);
             cellX = Math.Clamp(cellX, 0, totalRows - 1);
             cellY = Math.Clamp(cellY, 0, totalColumns - 1);
             spatialGrid[cellX + cellY * totalRows].Add(boids[i]);
@@ -113,8 +133,8 @@ public class FlockingSim : Simulation
                 for (int yOffset = -1; yOffset <= 1; yOffset++)
                 {
                     // check all neighboring cells
-                    int cellX = (int)(boid.position.X / BoidPerceptionRadius);
-                    int cellY = (int)(boid.position.Y / BoidPerceptionRadius);
+                    int cellX = (int)(boid.position.X / boidPerceptionRadius);
+                    int cellY = (int)(boid.position.Y / boidPerceptionRadius);
                     int neighborX = cellX + xOffset;
                     int neighborY = cellY + yOffset;
 
@@ -129,13 +149,13 @@ public class FlockingSim : Simulation
                                 {
                                     // Check distance of boids
                                     float dist = Vector2.Distance(other.position, boid.position);
-                                    if (dist < BoidPerceptionRadius)
+                                    if (dist < boidPerceptionRadius)
                                     {
                                         boid.neighbors++;
                                         totalVelocity += other.velocity;
                                         totalPositions += other.position;
                                         Vector2 diff = boid.position - other.position;
-                                        if (dist < BoidPerceptionRadius && dist > 0.01f)
+                                        if (dist < boidPerceptionRadius && dist > 0.01f)
                                             diff /= dist * dist; // Push harder inversely proportional to distance
                                         escapeDirection += diff;
                                     }
@@ -163,7 +183,7 @@ public class FlockingSim : Simulation
             Vector2 mousePos = Raylib.GetMousePosition();
             if (Vector2.Distance(boid.position, mousePos) < 150f && Raylib.IsMouseButtonDown(MouseButton.Left))
             {
-                Vector2 escape = Vector2.Normalize(boid.position - mousePos) * MaximumBoidSpeed;
+                Vector2 escape = Vector2.Normalize(boid.position - mousePos) * maximumBoidSpeed;
 
                 // Forcefully snap 20% of their velocity toward the escape vector instantly this frame
                 boid.velocity = Vector2.Lerp(boid.velocity, escape, 0.2f);
@@ -175,35 +195,35 @@ public class FlockingSim : Simulation
             {
                 // Calculate alignment steering
                 totalVelocity /= neighbors;
-                totalVelocity = Vector2.Normalize(totalVelocity) * MaximumBoidSpeed;
+                totalVelocity = Vector2.Normalize(totalVelocity) * maximumBoidSpeed;
 
                 // Calculate cohesion steering
                 totalPositions /= neighbors;
                 Vector2 directionToCenter = totalPositions - boid.position;
-                directionToCenter = Vector2.Normalize(directionToCenter) * MaximumBoidSpeed;
+                directionToCenter = Vector2.Normalize(directionToCenter) * maximumBoidSpeed;
 
                 // Calculate separation steering
-                escapeDirection = Vector2.Normalize(escapeDirection) * MaximumBoidSpeed;
+                escapeDirection = Vector2.Normalize(escapeDirection) * maximumBoidSpeed;
 
                 Vector2 desiredSteering = (totalVelocity * alignmentWeight) + (directionToCenter * cohesionWeight) + (escapeDirection * separationWeight);
                 if (desiredSteering.Length() > 0)
                 {
-                    desiredSteering = Vector2.Normalize(desiredSteering) * MaximumBoidSpeed;
+                    desiredSteering = Vector2.Normalize(desiredSteering) * maximumBoidSpeed;
                     steering += desiredSteering - boid.velocity;
                 }
             }
 
             // Steer the boid
-            if (steering.Length() > MaximumSteeringForce)
-                steering = Vector2.Normalize(steering) * MaximumSteeringForce;
+            if (steering.Length() > maximumSteeringForce)
+                steering = Vector2.Normalize(steering) * maximumSteeringForce;
             if (Raylib.IsMouseButtonDown(MouseButton.Right))
             {
                 steering += new Vector2(MathF.Cos(steerAngle), MathF.Sin(steerAngle)) * 1000;
             }
             boid.velocity += steering * deltaTime;
-            if (boid.velocity.Length() > MaximumBoidSpeed)
+            if (boid.velocity.Length() > maximumBoidSpeed)
             {
-                boid.velocity = Vector2.Normalize(boid.velocity) * MaximumBoidSpeed;
+                boid.velocity = Vector2.Normalize(boid.velocity) * maximumBoidSpeed;
             }
 
             // Update boid position
@@ -233,14 +253,27 @@ public class FlockingSim : Simulation
         {
             boids.Clear();
         }
-        if (Raylib.IsKeyDown(KeyboardKey.One)) alignmentWeight = MathF.Max(0f, alignmentWeight - 0.01f);
-        if (Raylib.IsKeyDown(KeyboardKey.Two)) alignmentWeight += 0.01f;
+        if (Raylib.IsKeyDown(KeyboardKey.Down)) alignmentWeight = MathF.Max(0f, alignmentWeight - 0.01f);
+        if (Raylib.IsKeyDown(KeyboardKey.Up)) alignmentWeight += 0.01f;
 
-        if (Raylib.IsKeyDown(KeyboardKey.Three)) cohesionWeight = MathF.Max(0f, cohesionWeight - 0.01f);
-        if (Raylib.IsKeyDown(KeyboardKey.Four)) cohesionWeight += 0.01f;
+        if (Raylib.IsKeyDown(KeyboardKey.Left)) cohesionWeight = MathF.Max(0f, cohesionWeight - 0.01f);
+        if (Raylib.IsKeyDown(KeyboardKey.Right)) cohesionWeight += 0.01f;
 
-        if (Raylib.IsKeyDown(KeyboardKey.Five)) separationWeight = MathF.Max(0f, separationWeight - 0.01f);
-        if (Raylib.IsKeyDown(KeyboardKey.Six)) separationWeight += 0.01f;
+        if (Raylib.IsKeyDown(KeyboardKey.S)) separationWeight = MathF.Max(0f, separationWeight - 0.01f);
+        if (Raylib.IsKeyDown(KeyboardKey.W)) separationWeight += 0.01f;
+
+        if (Raylib.IsKeyDown(KeyboardKey.One)) maximumBoidSpeed = MathF.Max(0f, maximumBoidSpeed - 1f);
+        if (Raylib.IsKeyDown(KeyboardKey.Two)) maximumBoidSpeed += 1f;
+
+        if (Raylib.IsKeyDown(KeyboardKey.Three)) maximumSteeringForce = MathF.Max(0f, maximumSteeringForce - 1f);
+        if (Raylib.IsKeyDown(KeyboardKey.Four)) maximumSteeringForce += 1f;
+
+        if (Raylib.IsKeyDown(KeyboardKey.Down) || Raylib.IsKeyDown(KeyboardKey.Up) || Raylib.IsKeyDown(KeyboardKey.Left) || Raylib.IsKeyDown(KeyboardKey.Right) || Raylib.IsKeyDown(KeyboardKey.S) || Raylib.IsKeyDown(KeyboardKey.W) || Raylib.IsKeyDown(KeyboardKey.One) || Raylib.IsKeyDown(KeyboardKey.Two) || Raylib.IsKeyDown(KeyboardKey.Three) || Raylib.IsKeyDown(KeyboardKey.Four)) currentPreset = Preset.Custom;
+
+        if (Raylib.IsKeyPressed(KeyboardKey.Minus))
+            ApplyPreset(currentPreset-1);
+        if (Raylib.IsKeyPressed(KeyboardKey.Equal))
+            ApplyPreset(currentPreset+1);
     }
 
     protected override void Draw()
@@ -258,12 +291,26 @@ public class FlockingSim : Simulation
             vert2 = new Vector2(vert2.X * MathF.Cos(angle) - vert2.Y * MathF.Sin(angle), vert2.X * MathF.Sin(angle) + vert2.Y * MathF.Cos(angle)) + boid.position;
             vert3 = new Vector2(vert3.X * MathF.Cos(angle) - vert3.Y * MathF.Sin(angle), vert3.X * MathF.Sin(angle) + vert3.Y * MathF.Cos(angle)) + boid.position;
             // Draw the boid
-            byte r = (byte)(boid.velocity.X / MaximumBoidSpeed * 127 + 128);
-            byte g = (byte)(boid.velocity.Y / MaximumBoidSpeed * 127 + 128);
+            byte r = (byte)(boid.velocity.X / maximumBoidSpeed * 127 + 128);
+            byte g = (byte)(boid.velocity.Y / maximumBoidSpeed * 127 + 128);
             byte b = 200;
             byte alpha = (byte)Math.Clamp(50 + (boid.neighbors * 15), 50, 255);
             Raylib.DrawTriangle(vert1, vert2, vert3, new Color(r, g, b, alpha));
         }
+    }
+
+    public string presetName(Preset preset)
+    {
+        switch (preset)
+        {
+            case Preset.Custom:
+                return "Custom";
+            case Preset.Birds:
+                return "Birds";
+            case Preset.Ocean:
+                return "Ocean";
+        }
+        return "N/A";
     }
 
     protected override string AddDebugData()
@@ -271,14 +318,17 @@ public class FlockingSim : Simulation
         return $"[SYSTEM]\n" +
            $"FPS             : {Raylib.GetFPS()}\n" +
            $"Screen Space    : {screenWidth}x{screenHeight}\n" +
-           $"Spatial Grid    : {totalRows}x{totalColumns} Cells ({BoidPerceptionRadius}px tracking)\n\n" +
+           $"Spatial Grid    : {totalRows}x{totalColumns} Cells ({boidPerceptionRadius}px tracking)\n\n" +
            $"[FLOCK STATUS]\n" +
            $"Population      : {boids.Count:N0} boids\n\n" +
-           $"[REYNOLDS COEFFICIENTS]\n" +
-           $"[1/2] Alignment : {alignmentWeight:F2}\n" +
-           $"[3/4] Cohesion  : {cohesionWeight:F2}\n" +
-           $"[5/6] Separation: {separationWeight:F2}\n\n" +
+           $"[VARIABLES & COEFFICIENTS]\n" +
+           $"[Up/Down] Alignment : {alignmentWeight:F2}\n" +
+           $"[Left/Right] Cohesion  : {cohesionWeight:F2}\n" +
+           $"[w/s] Separation: {separationWeight:F2}\n" +
+           $"[1/2] Maximum Speed: {maximumBoidSpeed:F2}\n" +
+           $"[3/4] Turning Speed: {maximumSteeringForce:F2}\n\n" +
            $"[INPUT SUITE]\n" +
+           $"[+/-] Change Preset; Current: {presetName(currentPreset):F2}\n\n" +
            $"L-Click         : Predator Threat (Scatter)\n" +
            $"R-Click         : Gravitational Vortex (Orbit)\n" +
            $"Key [B]         : Stream Spawning Brush\n" +
