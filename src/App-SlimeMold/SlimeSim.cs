@@ -14,6 +14,11 @@ public class SlimeSim : Simulation
 
     Random random = new Random();
 
+    // GLSL helpers
+    Shader diffusionShader;
+    RenderTexture2D targetA;
+    RenderTexture2D targetB;
+
     // Slime agent which moves along pheromone trails
     public class SlimeAgent
     {
@@ -55,8 +60,16 @@ public class SlimeSim : Simulation
         pheromones = new Color[screenWidth * screenHeight];
         Array.Fill(pheromones, Color.Black);
 
+        // Allocate framebuffers
+        targetA = Raylib.LoadRenderTexture(screenWidth, screenHeight);
+        targetB = Raylib.LoadRenderTexture(screenWidth, screenHeight);
+
+        // Load custom GLSL pass for diffusion
+        string shaderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "diffusion.frag");
+        diffusionShader = Raylib.LoadShader(null, shaderPath);
+
         // Initialize slime agents
-        for (int i = 0; i < 30000; i++)
+        for (int i = 0; i < 50000; i++)
         {
             slimeAgents.Add(new SlimeAgent(random.Next(0, screenWidth), random.Next(0, screenHeight), (float)(random.NextDouble() * 2 * Math.PI)));
         }
@@ -64,8 +77,10 @@ public class SlimeSim : Simulation
 
     protected override void Update(float deltaTime)
     {
-        // Slime logic
-        for (int i = 0; i < slimeAgents.Count; i++)
+        // Pull fresh data
+        VramToCPU(targetB);
+        // Slime logic, runs in parallel
+        Parallel.For(0, slimeAgents.Count, i =>
         {
             // Detect at left, center, and right
             Vector2 pos = slimeAgents[i].position;
@@ -81,9 +96,9 @@ public class SlimeSim : Simulation
                 slimeAgents[i].angle += turnSpeed * deltaTime;
             if (right > left && center < right)
                 slimeAgents[i].angle -= turnSpeed * deltaTime;
-            // Wander if no pheromones in sight
-            if (right == 0 && left == 0 && center == 0)
-                slimeAgents[i].angle += (float)(random.NextDouble() * 50 - 25) * deltaTime;
+            // Wander if no pheromones in sight, does not work in parallel
+            // if (right == 0 && left == 0 && center == 0)
+            //     slimeAgents[i].angle += (float)(random.NextDouble() * 50 - 25) * deltaTime;
             // Move
             slimeAgents[i].position += new Vector2(MathF.Cos(rot), MathF.Sin(rot)) * moveSpeed * deltaTime;
             // Wrap position
@@ -91,29 +106,27 @@ public class SlimeSim : Simulation
             if (slimeAgents[i].position.X > screenWidth) slimeAgents[i].position.X = 1;
             if (slimeAgents[i].position.Y < 0) slimeAgents[i].position.Y = screenHeight - 1;
             if (slimeAgents[i].position.Y > screenHeight) slimeAgents[i].position.Y = 1;
-            AddPheromoneAt(slimeAgents[i].position.X, slimeAgents[i].position.Y, 255);
+        });
+
+        foreach (SlimeAgent agent in slimeAgents)
+        {
+            AddPheromoneAt(agent.position.X, agent.position.Y, 255);
         }
 
-        // Trail diffusion
-        Color[] blurredPheromones = new Color[screenWidth * screenHeight];
-        for (int i = 0; i < screenWidth; i++)
+        unsafe
         {
-            for (int j = 0; j < screenHeight; j++)
+            fixed (Color* pixel = pheromones)
             {
-                // Blur 3x3 radius
-                float averageTrail = 0f;
-                for (int q = -1; q <= 1; q++)
-                {
-                    for (int c = -1; c <= 1; c++)
-                    {
-                        averageTrail += GetPheromoneAt(i+q, j+c);
-                    }
-                }
-                // Set trail in buffer list and subtract decay
-                SetPheromoneAt(blurredPheromones, i, j, averageTrail/9 * 0.95f);
+                Raylib.UpdateTexture(targetA.Texture, pixel);
             }
         }
-        pheromones = blurredPheromones;
+
+        // Apply GLSL shader to diffuse pheromones
+        Raylib.BeginTextureMode(targetB);
+        Raylib.BeginShaderMode(diffusionShader);
+        Raylib.DrawTextureRec(targetA.Texture, new Rectangle(0, 0, screenWidth, -screenHeight), Vector2.Zero, Color.White);
+        Raylib.EndShaderMode();
+        Raylib.EndTextureMode();
     }
 
     // Get and set pheromone positions to prevent out of bounds accessing
@@ -141,6 +154,22 @@ public class SlimeSim : Simulation
         SetPheromoneAt(pheromones, x, y, GetPheromoneAt(x, y) + value);
     }
 
+    void VramToCPU(RenderTexture2D source)
+    {
+        Image gpuImage = Raylib.LoadImageFromTexture(source.Texture);
+        unsafe
+        {
+            Color* pixels = (Color*)gpuImage.Data;
+
+            // Copy bytes to memory array
+            fixed (Color* dest = pheromones)
+            {
+                Buffer.MemoryCopy(pixels, dest, pheromones.Length * sizeof(Color), pheromones.Length * sizeof(Color));
+            }
+        }
+        Raylib.UnloadImage(gpuImage);
+    }
+
     protected override void Draw()
     {
         Raylib.ClearBackground(new Color(20, 20, 20, 255));
@@ -158,6 +187,9 @@ public class SlimeSim : Simulation
     protected override void Deinitialize()
     {
         Raylib.UnloadTexture(trailTexture);
+        Raylib.UnloadShader(diffusionShader);
+        Raylib.UnloadRenderTexture(targetA);
+        Raylib.UnloadRenderTexture(targetB);
     }
 
     protected override string AddDebugData()
