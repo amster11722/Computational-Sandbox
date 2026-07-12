@@ -6,7 +6,7 @@ using Raylib_cs;
 public abstract class Simulation
 {
 
-    bool debugMenuOpen = false;
+    bool debugMenuOpen = true;
 
     // Function to initialize window of width, height with title
     public void Run(int width, int height, string title)
@@ -30,15 +30,25 @@ public abstract class Simulation
                 debugMenuOpen = !debugMenuOpen;
             if (debugMenuOpen)
             {
-                Raylib.DrawFPS(10, 10);
                 string data = "";
                 data += AddDebugData();
-                Raylib.DrawText(data, 10, 35, 20, new Color(0, 158, 47));
+                data += "\n\n[TAB] to close or open menu";
+                DrawTextWithOutline(data, 10, 10, 20, new Color(0, 158, 47), Color.Black, 2);
             }
             Raylib.EndDrawing();
         }
         Deinitialize();
         Raylib.CloseWindow();
+    }
+
+    void DrawTextWithOutline(string text, int x, int y, int fontSize, Color textColor, Color outlineColor, int strokeWidth)
+    {
+        Raylib.DrawText(text, x - strokeWidth, y, fontSize, outlineColor);
+        Raylib.DrawText(text, x + strokeWidth, y, fontSize, outlineColor);
+        Raylib.DrawText(text, x, y - strokeWidth, fontSize, outlineColor);
+        Raylib.DrawText(text, x, y + strokeWidth, fontSize, outlineColor);
+
+        Raylib.DrawText(text, x, y, fontSize, textColor);
     }
 
     protected virtual void Initialize() { }

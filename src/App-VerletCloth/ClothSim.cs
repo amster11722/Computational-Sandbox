@@ -11,6 +11,8 @@ public class ClothSim : Simulation
     int clothWidth = 800;
     int clothRes = 150;
 
+    float timeSinceReset = 10f;
+
     Random random = new Random();
 
     public class Particle
@@ -107,38 +109,15 @@ public class ClothSim : Simulation
         }
 
         // Engine warmup to prevent initial chaos
-        float fixedDt = 0.016f;
-        int gravity = 600;
-
-        for (int step = 0; step < 150; step++)
-        {
-            for (int i = 0; i < particles.Count; i++)
-            {
-                if (!particles[i].pinned)
-                {
-                    Vector2 currentPos = particles[i].position;
-
-                    // Apply drag damping (0.98f) so the initial drop energy actively drains out
-                    float velX = (particles[i].position.X - particles[i].prevPosition.X) * 0.98f;
-                    float velY = (particles[i].position.Y - particles[i].prevPosition.Y) * 0.98f;
-
-                    particles[i].position.X += velX;
-                    particles[i].position.Y += velY + gravity * fixedDt * fixedDt;
-                    particles[i].prevPosition = currentPos;
-                }
-            }
-
-            for (int c = 0; c < 15; c++)
-            {
-                correctConstraints();
-            }
-        }
+        settleCloth(150);
     }
 
     protected override void Update(float deltaTime)
     {
 
         if (deltaTime > 0.02f) deltaTime = 0.016f; // prevents lag spikes from invoking chaos
+
+        timeSinceReset += deltaTime;
 
         int a = 600; // gravity
 
@@ -148,8 +127,8 @@ public class ClothSim : Simulation
             if (!particles[i].pinned)
             {
                 Vector2 prev = new Vector2(particles[i].position.X, particles[i].position.Y);
-                particles[i].position.X += particles[i].position.X - particles[i].prevPosition.X;
-                particles[i].position.Y += particles[i].position.Y - particles[i].prevPosition.Y + a * deltaTime * deltaTime;
+                particles[i].position.X += (particles[i].position.X - particles[i].prevPosition.X) * 0.999f;
+                particles[i].position.Y += (particles[i].position.Y - particles[i].prevPosition.Y + a * deltaTime * deltaTime) * 0.999f;
                 particles[i].prevPosition = prev;
             }
         }
@@ -160,8 +139,27 @@ public class ClothSim : Simulation
             correctConstraints();
         }
 
-        // Cloth cutting
+        // Cloth interaction
         Vector2 mousePos = Raylib.GetMousePosition();
+        Vector2 mouseDelta = mousePos - prevMousePos;
+        if (Raylib.IsMouseButtonDown(MouseButton.Right))
+        {
+            float dragRadius = 50f; // Distance around the cursor to influence nodes
+
+            foreach (Particle particle in particles)
+            {
+                float dist = Vector2.Distance(particle.position, mousePos);
+                if (!particle.pinned && dist < dragRadius)
+                {
+                    // Calculate a falloff factor so particles closer to the cursor 
+                    // track the mouse perfectly, while outer particles stretch smoothly
+                    float influence = (dragRadius - dist) / dragRadius;
+
+                    // Move the particle along with the mouse movement vector
+                    particle.position += mouseDelta * influence;
+                }
+            }
+        }
         if (Raylib.IsMouseButtonDown(MouseButton.Left))
         {
             foreach (Connection connection in connections)
@@ -185,6 +183,48 @@ public class ClothSim : Simulation
             }
         }
         prevMousePos = mousePos;
+        if (Raylib.IsKeyPressed(KeyboardKey.R))
+        {
+            timeSinceReset = 0f;
+            foreach (Connection connection in connections)
+            {
+                connection.isActive = true;
+            }
+            settleCloth(300);
+        }
+        if (Raylib.IsKeyDown(KeyboardKey.S))
+        {
+            settleCloth(100);
+        }
+    }
+
+    void settleCloth(int steps)
+    {
+        float fixedDt = 0.016f;
+        int gravity = 600;
+
+        for (int step = 0; step < steps; step++)
+        {
+            for (int i = 0; i < particles.Count; i++)
+            {
+                if (!particles[i].pinned)
+                {
+                    Vector2 currentPos = particles[i].position;
+
+                    float velX = (particles[i].position.X - particles[i].prevPosition.X) * 0.98f;
+                    float velY = (particles[i].position.Y - particles[i].prevPosition.Y) * 0.98f;
+
+                    particles[i].position.X += velX;
+                    particles[i].position.Y += velY + gravity * fixedDt * fixedDt;
+                    particles[i].prevPosition = currentPos;
+                }
+            }
+
+            for (int c = 0; c < 15; c++)
+            {
+                correctConstraints();
+            }
+        }
     }
 
     public void correctConstraints()
@@ -198,17 +238,24 @@ public class ClothSim : Simulation
                 {
                     Vector2 error = new Vector2(connection.A.position.X - connection.B.position.X, connection.A.position.Y - connection.B.position.Y);
                     float distance = Vector2.Distance(connection.A.position, connection.B.position);
-                    float difference = connection.restLength - distance;
-                    error = Vector2.Normalize(error);
-                    error *= difference;
-                    if (connection.A.pinned)
-                        connection.B.position -= error;
-                    else if (connection.B.pinned)
-                        connection.A.position += error;
+                    if (timeSinceReset > 3f && distance > connection.restLength * 6f)
+                    {
+                        connection.isActive = false;
+                    }
                     else
                     {
-                        connection.B.position -= error / 2f;
-                        connection.A.position += error / 2f;
+                        float difference = connection.restLength - distance;
+                        error = Vector2.Normalize(error);
+                        error *= difference;
+                        if (connection.A.pinned)
+                            connection.B.position -= error;
+                        else if (connection.B.pinned)
+                            connection.A.position += error;
+                        else
+                        {
+                            connection.B.position -= error / 2f;
+                            connection.A.position += error / 2f;
+                        }
                     }
                 }
             });
@@ -229,6 +276,27 @@ public class ClothSim : Simulation
                 Particle BL = particles[i * clothRes + j + 1];
                 Particle BR = particles[(i + 1) * clothRes + j + 1];
 
+                // Phong illumination
+
+                Vector2 surfaceEdge1 = TR.position - TL.position;
+                Vector2 surfaceEdge2 = BL.position - TL.position;
+
+                float faceAngle = MathF.Atan2(surfaceEdge1.Y + surfaceEdge2.Y, surfaceEdge1.X + surfaceEdge2.X);
+                Vector2 surfaceNormal = new Vector2(-MathF.Sin(faceAngle), MathF.Cos(faceAngle));
+
+                Vector2 faceCenter = (TL.position + TR.position + BL.position) / 3f;
+                Vector2 lightDirection = Vector2.Normalize(Vector2.Zero - faceCenter);
+
+                float diffuse = Vector2.Dot(surfaceNormal, lightDirection);
+                diffuse = MathF.Max(0.1f, (diffuse + 1.0f) * 0.5f); // Remap from [-1, 1] to [0.1, 1.0]
+
+                float speed = (TL.position - TL.prevPosition).Length();
+                byte r = (byte)Math.Clamp(30 + (diffuse * 120) + (speed * 10), 0, 255);
+                byte g = (byte)Math.Clamp(40 + (diffuse * 160) + (speed * 15), 0, 255);
+                byte b = (byte)Math.Clamp(70 + (diffuse * 220), 0, 255);
+
+                Color fabricColor = new Color(r, g, b, (byte)255);
+
                 bool topEdgeActive = TL.Right != null && TL.Right.isActive;
                 bool leftEdgeActive = TL.Down != null && TL.Down.isActive;
                 bool rightEdgeActive = TR.Down != null && TR.Down.isActive;
@@ -236,59 +304,59 @@ public class ClothSim : Simulation
 
                 float restLen = (float)clothWidth / clothRes;
 
-                float strainScale = 180f; // Amplifies structural tension
-                float speedScale = 40f;   // Amplifies kinetic motion brightness
+                // float strainScale = 180f; // Amplifies structural tension
+                // float speedScale = 20f;   // Amplifies kinetic motion brightness
 
                 // Only draw the first triangle if the top and right boundaries are intact
                 if (topEdgeActive && rightEdgeActive)
                 {
-                    float strainTop = Math.Abs(Vector2.Distance(TL.position, TR.position) - restLen);
-                    float strainRight = Math.Abs(Vector2.Distance(TR.position, BR.position) - restLen);
+                    // float strainTop = Math.Abs(Vector2.Distance(TL.position, TR.position) - restLen);
+                    // float strainRight = Math.Abs(Vector2.Distance(TR.position, BR.position) - restLen);
 
                     float speedTL = (TL.position - TL.prevPosition).Length();
                     float speedTR = (TR.position - TR.prevPosition).Length();
                     float speedBR = (BR.position - BR.prevPosition).Length();
-                    float avgSpeed = (speedTL + speedTR + speedBR) / 3f;
+                    // float avgSpeed = (speedTL + speedTR + speedBR) / 3f;
 
-                    int r = (int)(strainRight * strainScale + avgSpeed * speedScale * 1.5f);
-                    int g = (int)(avgSpeed * speedScale * 2.0f); // Spikes hard green during cuts
-                    int b = (int)(130 - (strainTop * strainScale) + avgSpeed * speedScale * 1.2f);
+                    // int r = (int)(strainRight * strainScale + avgSpeed * speedScale * 1.5f);
+                    // int g = (int)(avgSpeed * speedScale * 2.0f); // Spikes hard green during cuts
+                    // int b = (int)(130 - (strainTop * strainScale) + avgSpeed * speedScale * 1.2f);
 
-                    Color color = new Color(
-                        (byte)Math.Clamp(r, 25, 255),
-                        (byte)Math.Clamp(g, 20, 255),
-                        (byte)Math.Clamp(b, 45, 255),
-                        (byte)255
-                    );
+                    // Color color = new Color(
+                    //     (byte)Math.Clamp(r, 25, 255),
+                    //     (byte)Math.Clamp(g, 20, 255),
+                    //     (byte)Math.Clamp(b, 45, 255),
+                    //     (byte)255
+                    // );
 
-                    Raylib.DrawTriangle(BR.position, TR.position, TL.position, color);
-                    Raylib.DrawTriangle(TL.position, TR.position, BR.position, color);
+                    Raylib.DrawTriangle(BR.position, TR.position, TL.position, fabricColor);
+                    Raylib.DrawTriangle(TL.position, TR.position, BR.position, fabricColor);
                 }
 
                 // Only draw the second triangle if the bottom and left boundaries are intact
                 if (bottomEdgeActive && leftEdgeActive)
                 {
-                    float strainLeft = Math.Abs(Vector2.Distance(TL.position, BL.position) - restLen);
-                    float strainBottom = Math.Abs(Vector2.Distance(BL.position, BR.position) - restLen);
+                    // float strainLeft = Math.Abs(Vector2.Distance(TL.position, BL.position) - restLen);
+                    // float strainBottom = Math.Abs(Vector2.Distance(BL.position, BR.position) - restLen);
 
                     float speedTL = (TL.position - TL.prevPosition).Length();
                     float speedBL = (BL.position - BL.prevPosition).Length();
                     float speedBR = (BR.position - BR.prevPosition).Length();
-                    float avgSpeed = (speedTL + speedBL + speedBR) / 3f;
+                    // float avgSpeed = (speedTL + speedBL + speedBR) / 3f;
 
-                    int r = (int)(strainLeft * strainScale + avgSpeed * speedScale * 1.5f);
-                    int g = (int)(avgSpeed * speedScale * 2.0f);
-                    int b = (int)(130 - (strainBottom * strainScale) + avgSpeed * speedScale * 1.2f);
+                    // int r = (int)(strainLeft * strainScale + avgSpeed * speedScale * 1.5f);
+                    // int g = (int)(avgSpeed * speedScale * 2.0f);
+                    // int b = (int)(130 - (strainBottom * strainScale) + avgSpeed * speedScale * 1.2f);
 
-                    Color color = new Color(
-                        (byte)Math.Clamp(r, 25, 255),
-                        (byte)Math.Clamp(g, 20, 255),
-                        (byte)Math.Clamp(b, 45, 255),
-                        (byte)255
-                    );
+                    // Color color = new Color(
+                    //     (byte)Math.Clamp(r, 25, 255),
+                    //     (byte)Math.Clamp(g, 20, 255),
+                    //     (byte)Math.Clamp(b, 45, 255),
+                    //     (byte)255
+                    // );
 
-                    Raylib.DrawTriangle(TL.position, BL.position, BR.position, color);
-                    Raylib.DrawTriangle(BR.position, BL.position, TL.position, color);
+                    Raylib.DrawTriangle(TL.position, BL.position, BR.position, fabricColor);
+                    Raylib.DrawTriangle(BR.position, BL.position, TL.position, fabricColor);
                 }
             }
         }
@@ -296,6 +364,20 @@ public class ClothSim : Simulation
 
     protected override string AddDebugData()
     {
-        return "";
+        int activeConnections = 0;
+        foreach (var c in connections) if (c.isActive) activeConnections++;
+
+        return $"[SYSTEM]\n" +
+               $"FPS             : {Raylib.GetFPS()}\n" +
+               $"Thread Model    : C# Parallel.ForEach (4-Stage Relaxation)\n\n" +
+               $"[VERLET SHEET METRICS]\n" +
+               $"Mesh Resolution : {clothRes}x{clothRes}\n" +
+               $"Total Nodes     : {particles.Count:N0} vertices\n" +
+               $"Structural Links: {activeConnections:N0} active / {connections.Count:N0} total\n\n" +
+               $"[CLOTH CONTROLS]\n" +
+               $"L-Click + Drag  : Razor / Slice Structural Connections\n" +
+               $"R-Click + Drag  : Drag Cloth\n" +
+               $"Key [S]         : Settle Cloth\n" +
+               $"Key [R]         : Mend Sheet / Restore Connections";
     }
 }

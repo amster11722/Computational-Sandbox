@@ -113,10 +113,40 @@ public class SlimeSim : Simulation
             if (slimeAgents[i].position.Y > canvasHeight) slimeAgents[i].position.Y = 1;
         });
 
+        // Update pheromones to texture
+
         foreach (SlimeAgent agent in slimeAgents)
         {
             AddPheromoneAt(agent.position.X, agent.position.Y, 255);
         }
+
+        // Mouse interactivity
+        if (Raylib.IsMouseButtonDown(MouseButton.Left) || Raylib.IsMouseButtonDown(MouseButton.Right))
+        {
+            Vector2 screenMouse = Raylib.GetMousePosition();
+            int canvasX = (int)(screenMouse.X / screenWidth * canvasWidth);
+            int canvasY = (int)((screenHeight - screenMouse.Y) / screenHeight * canvasHeight);
+            int brushRadius = 15;
+            byte depositValue = Raylib.IsMouseButtonDown(MouseButton.Left) ? (byte)255 : (byte)0;
+            for (int dx = -brushRadius; dx <= brushRadius; dx++)
+            {
+                for (int dy = -brushRadius; dy <= brushRadius; dy++)
+                {
+                    if (dx * dx + dy * dy <= brushRadius * brushRadius)
+                    {
+                        SetPheromoneAt(pheromones, canvasX + dx, canvasY + dy, depositValue);
+                    }
+                }
+            }
+        }
+
+        // Adjust physics via keyboard
+        if (Raylib.IsKeyDown(KeyboardKey.Up)) moveSpeed += 5f;
+        if (Raylib.IsKeyDown(KeyboardKey.Down)) moveSpeed = MathF.Max(10f, moveSpeed - 5f);
+        if (Raylib.IsKeyDown(KeyboardKey.Right)) turnSpeed += 1f;
+        if (Raylib.IsKeyDown(KeyboardKey.Left)) turnSpeed = MathF.Max(0f, turnSpeed - 1f);
+        if (Raylib.IsKeyDown(KeyboardKey.W)) sensorDistance += 0.5f;
+        if (Raylib.IsKeyDown(KeyboardKey.S)) sensorDistance = MathF.Max(1f, sensorDistance - 0.5f);
 
         unsafe
         {
@@ -132,6 +162,11 @@ public class SlimeSim : Simulation
         Raylib.DrawTextureRec(targetA.Texture, new Rectangle(0, 0, canvasWidth, -canvasHeight), Vector2.Zero, Color.White);
         Raylib.EndShaderMode();
         Raylib.EndTextureMode();
+
+        // Pass time to palette shader
+        int timeLocation = Raylib.GetShaderLocation(paletteShader, "u_time");
+        float totalTime = (float)Raylib.GetTime();
+        Raylib.SetShaderValue(paletteShader, timeLocation, totalTime, ShaderUniformDataType.Float);
     }
 
     // Get and set pheromone positions to prevent out of bounds accessing
@@ -196,6 +231,17 @@ public class SlimeSim : Simulation
 
     protected override string AddDebugData()
     {
-        return "";
+        return $"[SYSTEM]\n" +
+           $"FPS             : {Raylib.GetFPS()}\n" +
+           $"Resolution      : {screenWidth}x{screenHeight} (Native)\n" +
+           $"Canvas Target   : {canvasWidth}x{canvasHeight} (Downsampled)\n\n" +
+           $"[SIMULATION]\n" +
+           $"Population Size : {populationSize:N0} agents\n" +
+           $"Velocity (Up/Down)  : {moveSpeed:F0} px/s\n" +
+           $"Steering (Left/Right)  : {turnSpeed:F0} rad/s\n" +
+           $"Sensors  (W/S)  : {sensorDistance:F1} px\n\n" +
+           $"[GOD MODE]\n" +
+           $"L-Click : Deposit Pheromones\n" +
+           $"R-Click : Vacuum/Erase Trails\n";
     }
 }

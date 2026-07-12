@@ -118,9 +118,9 @@ public class FlockingSim : Simulation
                     int neighborX = cellX + xOffset;
                     int neighborY = cellY + yOffset;
 
-                    if (neighborX < totalRows && neighborX > 0)
+                    if (neighborX < totalRows && neighborX >= 0)
                     {
-                        if (neighborY < totalColumns && neighborY > 0)
+                        if (neighborY < totalColumns && neighborY >= 0)
                         {
                             int hash = neighborX + neighborY * totalRows;
                             foreach (Boid other in spatialGrid[hash])
@@ -215,10 +215,32 @@ public class FlockingSim : Simulation
             if (boid.position.Y < 0) boid.position.Y = screenHeight - 1;
             if (boid.position.Y > screenHeight) boid.position.Y = 1;
         }
+        // Interactivity
         if (Raylib.IsMouseButtonDown(MouseButton.Right))
         {
             steerAngle += 3.0f * deltaTime; // Smoothly rotates 3 radians per second
         }
+        if (Raylib.IsKeyDown(KeyboardKey.B))
+        {
+            Vector2 mousePos = Raylib.GetMousePosition();
+            boids.Add(new Boid(
+                (int)mousePos.X,
+                (int)mousePos.Y,
+                new Vector2(random.Next(-300, 300), random.Next(-300, 300))
+            ));
+        }
+        if (Raylib.IsKeyPressed(KeyboardKey.C))
+        {
+            boids.Clear();
+        }
+        if (Raylib.IsKeyDown(KeyboardKey.One)) alignmentWeight = MathF.Max(0f, alignmentWeight - 0.01f);
+        if (Raylib.IsKeyDown(KeyboardKey.Two)) alignmentWeight += 0.01f;
+
+        if (Raylib.IsKeyDown(KeyboardKey.Three)) cohesionWeight = MathF.Max(0f, cohesionWeight - 0.01f);
+        if (Raylib.IsKeyDown(KeyboardKey.Four)) cohesionWeight += 0.01f;
+
+        if (Raylib.IsKeyDown(KeyboardKey.Five)) separationWeight = MathF.Max(0f, separationWeight - 0.01f);
+        if (Raylib.IsKeyDown(KeyboardKey.Six)) separationWeight += 0.01f;
     }
 
     protected override void Draw()
@@ -236,8 +258,8 @@ public class FlockingSim : Simulation
             vert2 = new Vector2(vert2.X * MathF.Cos(angle) - vert2.Y * MathF.Sin(angle), vert2.X * MathF.Sin(angle) + vert2.Y * MathF.Cos(angle)) + boid.position;
             vert3 = new Vector2(vert3.X * MathF.Cos(angle) - vert3.Y * MathF.Sin(angle), vert3.X * MathF.Sin(angle) + vert3.Y * MathF.Cos(angle)) + boid.position;
             // Draw the boid
-            byte r = (byte)((boid.velocity.X / MaximumBoidSpeed) * 127 + 128);
-            byte g = (byte)((boid.velocity.Y / MaximumBoidSpeed) * 127 + 128);
+            byte r = (byte)(boid.velocity.X / MaximumBoidSpeed * 127 + 128);
+            byte g = (byte)(boid.velocity.Y / MaximumBoidSpeed * 127 + 128);
             byte b = 200;
             byte alpha = (byte)Math.Clamp(50 + (boid.neighbors * 15), 50, 255);
             Raylib.DrawTriangle(vert1, vert2, vert3, new Color(r, g, b, alpha));
@@ -246,6 +268,20 @@ public class FlockingSim : Simulation
 
     protected override string AddDebugData()
     {
-        return "Entities: " + boids.Count;
+        return $"[SYSTEM]\n" +
+           $"FPS             : {Raylib.GetFPS()}\n" +
+           $"Screen Space    : {screenWidth}x{screenHeight}\n" +
+           $"Spatial Grid    : {totalRows}x{totalColumns} Cells ({BoidPerceptionRadius}px tracking)\n\n" +
+           $"[FLOCK STATUS]\n" +
+           $"Population      : {boids.Count:N0} boids\n\n" +
+           $"[REYNOLDS COEFFICIENTS]\n" +
+           $"[1/2] Alignment : {alignmentWeight:F2}\n" +
+           $"[3/4] Cohesion  : {cohesionWeight:F2}\n" +
+           $"[5/6] Separation: {separationWeight:F2}\n\n" +
+           $"[INPUT SUITE]\n" +
+           $"L-Click         : Predator Threat (Scatter)\n" +
+           $"R-Click         : Gravitational Vortex (Orbit)\n" +
+           $"Key [B]         : Stream Spawning Brush\n" +
+           $"Key [C]         : Flush Flock Memory";
     }
 }
