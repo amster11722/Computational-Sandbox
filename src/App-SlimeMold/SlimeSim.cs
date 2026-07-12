@@ -8,19 +8,23 @@ public class SlimeSim : Simulation
     float sensorDistance = 20f;
     float turnSpeed = 20f;
     float moveSpeed = 200f;
+    int populationSize = 80000;
 
     int screenWidth = 500;
     int screenHeight = 500;
+    int canvasWidth = 1920;
+    int canvasHeight = 1080;
 
     Random random = new Random();
 
     // GLSL helpers
     Shader diffusionShader;
+    Shader paletteShader;
     RenderTexture2D targetA;
     RenderTexture2D targetB;
 
     // Slime agent which moves along pheromone trails
-    public class SlimeAgent
+    public struct SlimeAgent
     {
         public Vector2 position;
         public float angle; // Angle in radians
@@ -32,9 +36,8 @@ public class SlimeSim : Simulation
         }
     }
 
-    List<SlimeAgent> slimeAgents = new List<SlimeAgent>();
+    SlimeAgent[] slimeAgents;
     Color[]? pheromones;
-    Texture2D trailTexture;
 
     static void Main()
     {
@@ -55,23 +58,25 @@ public class SlimeSim : Simulation
 
         // Initialize pheromone trail map
         Image blankImage = Raylib.GenImageColor(screenWidth, screenHeight, Color.Black);
-        trailTexture = Raylib.LoadTextureFromImage(blankImage);
 
-        pheromones = new Color[screenWidth * screenHeight];
+        pheromones = new Color[canvasWidth * canvasHeight];
         Array.Fill(pheromones, Color.Black);
 
         // Allocate framebuffers
-        targetA = Raylib.LoadRenderTexture(screenWidth, screenHeight);
-        targetB = Raylib.LoadRenderTexture(screenWidth, screenHeight);
+        targetA = Raylib.LoadRenderTexture(canvasWidth, canvasHeight);
+        targetB = Raylib.LoadRenderTexture(canvasWidth, canvasHeight);
 
-        // Load custom GLSL pass for diffusion
-        string shaderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "diffusion.frag");
-        diffusionShader = Raylib.LoadShader(null, shaderPath);
+        // Load custom GLSL pass for diffusion and coloring
+        string binDir = AppDomain.CurrentDomain.BaseDirectory;
+        diffusionShader = Raylib.LoadShader(null, Path.Combine(binDir, "diffusion.frag"));
+        paletteShader = Raylib.LoadShader(null, Path.Combine(binDir, "palette.frag"));
+
+        slimeAgents = new SlimeAgent[populationSize];
 
         // Initialize slime agents
-        for (int i = 0; i < 50000; i++)
+        for (int i = 0; i < populationSize; i++)
         {
-            slimeAgents.Add(new SlimeAgent(random.Next(0, screenWidth), random.Next(0, screenHeight), (float)(random.NextDouble() * 2 * Math.PI)));
+            slimeAgents[i] = new SlimeAgent(random.Next(0, canvasWidth), random.Next(0, canvasHeight), (float)(random.NextDouble() * 2 * Math.PI));
         }
     }
 
@@ -80,7 +85,7 @@ public class SlimeSim : Simulation
         // Pull fresh data
         VramToCPU(targetB);
         // Slime logic, runs in parallel
-        Parallel.For(0, slimeAgents.Count, i =>
+        Parallel.For(0, populationSize, i =>
         {
             // Detect at left, center, and right
             Vector2 pos = slimeAgents[i].position;
@@ -102,10 +107,10 @@ public class SlimeSim : Simulation
             // Move
             slimeAgents[i].position += new Vector2(MathF.Cos(rot), MathF.Sin(rot)) * moveSpeed * deltaTime;
             // Wrap position
-            if (slimeAgents[i].position.X < 0) slimeAgents[i].position.X = screenWidth - 1;
-            if (slimeAgents[i].position.X > screenWidth) slimeAgents[i].position.X = 1;
-            if (slimeAgents[i].position.Y < 0) slimeAgents[i].position.Y = screenHeight - 1;
-            if (slimeAgents[i].position.Y > screenHeight) slimeAgents[i].position.Y = 1;
+            if (slimeAgents[i].position.X < 0) slimeAgents[i].position.X = canvasWidth - 1;
+            if (slimeAgents[i].position.X > canvasWidth) slimeAgents[i].position.X = 1;
+            if (slimeAgents[i].position.Y < 0) slimeAgents[i].position.Y = canvasHeight - 1;
+            if (slimeAgents[i].position.Y > canvasHeight) slimeAgents[i].position.Y = 1;
         });
 
         foreach (SlimeAgent agent in slimeAgents)
@@ -124,7 +129,7 @@ public class SlimeSim : Simulation
         // Apply GLSL shader to diffuse pheromones
         Raylib.BeginTextureMode(targetB);
         Raylib.BeginShaderMode(diffusionShader);
-        Raylib.DrawTextureRec(targetA.Texture, new Rectangle(0, 0, screenWidth, -screenHeight), Vector2.Zero, Color.White);
+        Raylib.DrawTextureRec(targetA.Texture, new Rectangle(0, 0, canvasWidth, -canvasHeight), Vector2.Zero, Color.White);
         Raylib.EndShaderMode();
         Raylib.EndTextureMode();
     }
@@ -132,16 +137,16 @@ public class SlimeSim : Simulation
     // Get and set pheromone positions to prevent out of bounds accessing
     float GetPheromoneAt(float x, float y)
     {
-        int clampedX = Math.Clamp((int)MathF.Round(x), 0, screenWidth - 1);
-        int clampedY = Math.Clamp((int)MathF.Round(y), 0, screenHeight - 1);
-        return pheromones[clampedX + clampedY * screenWidth].R;
+        int clampedX = Math.Clamp((int)MathF.Round(x), 0, canvasWidth - 1);
+        int clampedY = Math.Clamp((int)MathF.Round(y), 0, canvasHeight - 1);
+        return pheromones[clampedX + clampedY * canvasWidth].R;
     }
 
     void SetPheromoneAt(Color[] list, float x, float y, float value)
     {
-        int clampedX = Math.Clamp((int)MathF.Round(x), 0, screenWidth - 1);
-        int clampedY = Math.Clamp((int)MathF.Round(y), 0, screenHeight - 1);
-        int index = clampedX + clampedY * screenWidth;
+        int clampedX = Math.Clamp((int)MathF.Round(x), 0, canvasWidth - 1);
+        int clampedY = Math.Clamp((int)MathF.Round(y), 0, canvasHeight - 1);
+        int index = clampedX + clampedY * canvasWidth;
         byte val = (byte)Math.Min(255, value);
         list[index].R = val;
         list[index].G = val;
@@ -172,22 +177,19 @@ public class SlimeSim : Simulation
 
     protected override void Draw()
     {
-        Raylib.ClearBackground(new Color(20, 20, 20, 255));
-        // Blit trail pixels to texture and screen
-        unsafe
-        {
-            fixed (Color* pixel = pheromones)
-            {
-                Raylib.UpdateTexture(trailTexture, pixel);
-            }
-        }
-        Raylib.DrawTexture(trailTexture, 0, 0, Color.White);
+        Raylib.ClearBackground(Color.Black);
+        Rectangle sourceRec = new Rectangle(0, 0, canvasWidth, -canvasHeight);
+
+        Rectangle destRec = new Rectangle(0, 0, screenWidth, screenHeight);
+        Raylib.BeginShaderMode(paletteShader);
+        Raylib.DrawTexturePro(targetB.Texture, sourceRec, destRec, Vector2.Zero, 0.0f, Color.White);
+        Raylib.EndShaderMode();
     }
 
     protected override void Deinitialize()
     {
-        Raylib.UnloadTexture(trailTexture);
         Raylib.UnloadShader(diffusionShader);
+        Raylib.UnloadShader(paletteShader);
         Raylib.UnloadRenderTexture(targetA);
         Raylib.UnloadRenderTexture(targetB);
     }

@@ -17,6 +17,9 @@
   <None Update="diffusion.frag">
     <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
   </None>
+    <None Update="palette.frag">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+  </None>
 </ItemGroup>
 
 </Project>
