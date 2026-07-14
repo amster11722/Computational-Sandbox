@@ -39,6 +39,68 @@ public class SlimeSim : Simulation
     SlimeAgent[] slimeAgents;
     Color[]? pheromones;
 
+    public enum Preset { Custom, Slime, Snakes, Cells, Viruses, Bacteria, Veins, Maze, Null }
+
+    Preset currentPreset = Preset.Slime;
+
+    void ApplyPreset(Preset preset)
+    {
+        if (preset < 0) preset = Preset.Custom;
+        if (preset == Preset.Custom || preset == Preset.Null) return;
+        currentPreset = preset;
+        switch (preset)
+        {
+            case Preset.Custom:
+                break;
+            case Preset.Slime:
+                sensorDistance = 20f; turnSpeed = 20f; moveSpeed = 200f;
+                break;
+            case Preset.Snakes:
+                sensorDistance = 20f; turnSpeed = 20f; moveSpeed = 500f;
+                break;
+            case Preset.Cells:
+                sensorDistance = 20f; turnSpeed = 150f; moveSpeed = 420f;
+                break;
+            case Preset.Viruses:
+                sensorDistance = 3f; turnSpeed = 150f; moveSpeed = 420f;
+                break;
+            case Preset.Bacteria:
+                sensorDistance = 18f; turnSpeed = 200f; moveSpeed = 275f;
+                break;
+            case Preset.Veins:
+                sensorDistance = 20f; turnSpeed = 390f; moveSpeed = 40f;
+                break;
+            case Preset.Maze:
+                sensorDistance = 65f; turnSpeed = 280f; moveSpeed = 1000f;
+                break;
+
+        }
+    }
+
+    public string presetName(Preset preset)
+    {
+        switch (preset)
+        {
+            case Preset.Custom:
+                return "Custom";
+            case Preset.Slime:
+                return "Slime";
+            case Preset.Snakes:
+                return "Snakes";
+            case Preset.Cells:
+                return "Cells";
+            case Preset.Viruses:
+                return "Viruses";
+            case Preset.Bacteria:
+                return "Bacteria";
+            case Preset.Veins:
+                return "Veins";
+            case Preset.Maze:
+                return "Maze";
+        }
+        return "N/A";
+    }
+
     static void Main()
     {
         // Set up window
@@ -148,6 +210,13 @@ public class SlimeSim : Simulation
         if (Raylib.IsKeyDown(KeyboardKey.W)) sensorDistance += 0.5f;
         if (Raylib.IsKeyDown(KeyboardKey.S)) sensorDistance = MathF.Max(1f, sensorDistance - 0.5f);
 
+        if (Raylib.IsKeyDown(KeyboardKey.Down) || Raylib.IsKeyDown(KeyboardKey.Up) || Raylib.IsKeyDown(KeyboardKey.Left) || Raylib.IsKeyDown(KeyboardKey.Right) || Raylib.IsKeyDown(KeyboardKey.S) || Raylib.IsKeyDown(KeyboardKey.W)) currentPreset = Preset.Custom;
+
+        if (Raylib.IsKeyPressed(KeyboardKey.Minus))
+            ApplyPreset(currentPreset - 1);
+        if (Raylib.IsKeyPressed(KeyboardKey.Equal))
+            ApplyPreset(currentPreset + 1);
+
         unsafe
         {
             fixed (Color* pixel = pheromones)
@@ -240,7 +309,8 @@ public class SlimeSim : Simulation
            $"Velocity (Up/Down)  : {moveSpeed:F0} px/s\n" +
            $"Steering (Left/Right)  : {turnSpeed:F0} rad/s\n" +
            $"Sensors  (W/S)  : {sensorDistance:F1} px\n\n" +
-           $"[GOD MODE]\n" +
+           $"[+/-] Change Preset; Current: {presetName(currentPreset):F2}\n\n" +
+           $"[INTERACTION]\n" +
            $"L-Click : Deposit Pheromones\n" +
            $"R-Click : Vacuum/Erase Trails\n";
     }

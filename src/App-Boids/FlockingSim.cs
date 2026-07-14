@@ -20,25 +20,50 @@ public class FlockingSim : Simulation
     float maximumBoidSpeed = 250;
     float maximumSteeringForce = 200;
 
-    public enum Preset { Custom, Birds, Ocean, Null }
+    public enum Preset { Custom, Reef, Ocean, Meteor, Fish, Null }
 
-    Preset currentPreset = Preset.Birds;
+    Preset currentPreset = Preset.Reef;
 
     void ApplyPreset(Preset preset)
     {
-        if(preset == Preset.Custom || preset == Preset.Null) return;
+        if (preset < 0) preset = Preset.Custom;
+        if (preset == Preset.Custom || preset == Preset.Null) return;
         currentPreset = preset;
         switch (preset)
         {
             case Preset.Custom:
                 break;
-            case Preset.Birds:
-                alignmentWeight = 2; cohesionWeight = 1; separationWeight = 1.8f; boidPerceptionRadius = 40; maximumBoidSpeed = 250; maximumSteeringForce = 200;
+            case Preset.Reef:
+                alignmentWeight = 2; cohesionWeight = 1; separationWeight = 1.8f; maximumBoidSpeed = 250; maximumSteeringForce = 200;
                 break;
             case Preset.Ocean:
-                alignmentWeight = 0.3f; cohesionWeight = 1.5f; separationWeight = 1.9f; boidPerceptionRadius = 40; maximumBoidSpeed = 250; maximumSteeringForce = 200;
+                alignmentWeight = 0.3f; cohesionWeight = 1.5f; separationWeight = 1.9f; maximumBoidSpeed = 250; maximumSteeringForce = 200;
+                break;
+            case Preset.Meteor:
+                alignmentWeight = 2.85f; cohesionWeight = 1.4f; separationWeight = 0.6f; maximumBoidSpeed = 380; maximumSteeringForce = 145;
+                break;
+            case Preset.Fish:
+                alignmentWeight = 3.1f; cohesionWeight = 1.7f; separationWeight = 2.8f; maximumBoidSpeed = 65; maximumSteeringForce = 400;
                 break;
         }
+    }
+
+    public string presetName(Preset preset)
+    {
+        switch (preset)
+        {
+            case Preset.Custom:
+                return "Custom";
+            case Preset.Reef:
+                return "Reef";
+            case Preset.Ocean:
+                return "Ocean";
+            case Preset.Meteor:
+                return "Meteors";
+            case Preset.Fish:
+                return "Fish";
+        }
+        return "N/A";
     }
 
     // Basic boid class for a single entity
@@ -271,9 +296,9 @@ public class FlockingSim : Simulation
         if (Raylib.IsKeyDown(KeyboardKey.Down) || Raylib.IsKeyDown(KeyboardKey.Up) || Raylib.IsKeyDown(KeyboardKey.Left) || Raylib.IsKeyDown(KeyboardKey.Right) || Raylib.IsKeyDown(KeyboardKey.S) || Raylib.IsKeyDown(KeyboardKey.W) || Raylib.IsKeyDown(KeyboardKey.One) || Raylib.IsKeyDown(KeyboardKey.Two) || Raylib.IsKeyDown(KeyboardKey.Three) || Raylib.IsKeyDown(KeyboardKey.Four)) currentPreset = Preset.Custom;
 
         if (Raylib.IsKeyPressed(KeyboardKey.Minus))
-            ApplyPreset(currentPreset-1);
+            ApplyPreset(currentPreset - 1);
         if (Raylib.IsKeyPressed(KeyboardKey.Equal))
-            ApplyPreset(currentPreset+1);
+            ApplyPreset(currentPreset + 1);
     }
 
     protected override void Draw()
@@ -297,20 +322,6 @@ public class FlockingSim : Simulation
             byte alpha = (byte)Math.Clamp(50 + (boid.neighbors * 15), 50, 255);
             Raylib.DrawTriangle(vert1, vert2, vert3, new Color(r, g, b, alpha));
         }
-    }
-
-    public string presetName(Preset preset)
-    {
-        switch (preset)
-        {
-            case Preset.Custom:
-                return "Custom";
-            case Preset.Birds:
-                return "Birds";
-            case Preset.Ocean:
-                return "Ocean";
-        }
-        return "N/A";
     }
 
     protected override string AddDebugData()
