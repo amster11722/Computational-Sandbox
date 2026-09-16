@@ -14,7 +14,7 @@ void main() {
     ivec2 texSize = textureSize(texture0, 0);
     vec2 texelSize = 1.0 / vec2(texSize);
 
-    vec4 sum = vec3(0.0);
+    vec4 sum = vec4(0.0);
 
     // 3x3 blur around current coordinate
 
