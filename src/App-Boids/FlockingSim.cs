@@ -7,8 +7,8 @@ public class FlockingSim : Simulation
 
     int screenWidth = 500;
     int screenHeight = 500;
-    int totalRows;
-    int totalColumns;
+    int gridColumns;
+    int gridRows;
     float steerAngle = 0;
 
     // Variables
@@ -72,8 +72,6 @@ public class FlockingSim : Simulation
         public Vector2 position;
         public Vector2 velocity;
         public int neighbors;
-        public Queue<Vector2> history = new Queue<Vector2>();
-
         public Boid(int x, int y, Vector2 vel)
         {
             position = new Vector2(x, y);
@@ -103,8 +101,8 @@ public class FlockingSim : Simulation
         int monitor = Raylib.GetCurrentMonitor();
         screenWidth = Raylib.GetMonitorWidth(monitor);
         screenHeight = Raylib.GetMonitorHeight(monitor);
-        totalRows = (int)MathF.Ceiling((float)screenWidth / boidPerceptionRadius);
-        totalColumns = (int)MathF.Ceiling((float)screenHeight / boidPerceptionRadius);
+        gridColumns = (int)MathF.Ceiling((float)screenWidth / boidPerceptionRadius);
+        gridRows = (int)MathF.Ceiling((float)screenHeight / boidPerceptionRadius);
 
         Raylib.SetWindowSize(screenWidth, screenHeight);
         Raylib.ToggleFullscreen();
@@ -115,12 +113,12 @@ public class FlockingSim : Simulation
             boids.Add(new Boid(random.Next(0, screenWidth), random.Next(0, screenHeight), new Vector2(random.Next(-300, 300), random.Next(-300, 300))));
         }
 
-        // Init spacial grid
-        for (int i = 0; i < totalRows; i++)
+        // Init spatial grid
+        for (int i = 0; i < gridColumns; i++)
         {
-            for (int j = 0; j < totalColumns; j++)
+            for (int j = 0; j < gridRows; j++)
             {
-                int hashKey = i + (j * totalRows);
+                int hashKey = i + (j * gridColumns);
                 spatialGrid.Add(hashKey, new List<Boid>());
             }
         }
@@ -138,9 +136,9 @@ public class FlockingSim : Simulation
             // Place boids into their proper grid
             int cellX = (int)(boids[i].position.X / boidPerceptionRadius);
             int cellY = (int)(boids[i].position.Y / boidPerceptionRadius);
-            cellX = Math.Clamp(cellX, 0, totalRows - 1);
-            cellY = Math.Clamp(cellY, 0, totalColumns - 1);
-            spatialGrid[cellX + cellY * totalRows].Add(boids[i]);
+            cellX = Math.Clamp(cellX, 0, gridColumns - 1);
+            cellY = Math.Clamp(cellY, 0, gridRows - 1);
+            spatialGrid[cellX + cellY * gridColumns].Add(boids[i]);
         }
 
         // Boid logic
@@ -163,11 +161,11 @@ public class FlockingSim : Simulation
                     int neighborX = cellX + xOffset;
                     int neighborY = cellY + yOffset;
 
-                    if (neighborX < totalRows && neighborX >= 0)
+                    if (neighborX < gridColumns && neighborX >= 0)
                     {
-                        if (neighborY < totalColumns && neighborY >= 0)
+                        if (neighborY < gridRows && neighborY >= 0)
                         {
-                            int hash = neighborX + neighborY * totalRows;
+                            int hash = neighborX + neighborY * gridColumns;
                             foreach (Boid other in spatialGrid[hash])
                             {
                                 if (other != boid)
@@ -200,7 +198,8 @@ public class FlockingSim : Simulation
             if (rawJitter.Length() > 0)
             {
                 // Normalize it so it represents a pure direction, then apply weight
-                wanderForce = Vector2.Normalize(rawJitter) * wanderingWeight;
+                if(rawJitter.LengthSquared() > 0)
+                    wanderForce = Vector2.Normalize(rawJitter) * wanderingWeight;
             }
             steering += wanderForce;
 
@@ -208,7 +207,10 @@ public class FlockingSim : Simulation
             Vector2 mousePos = Raylib.GetMousePosition();
             if (Vector2.Distance(boid.position, mousePos) < 150f && Raylib.IsMouseButtonDown(MouseButton.Left))
             {
-                Vector2 escape = Vector2.Normalize(boid.position - mousePos) * maximumBoidSpeed;
+                Vector2 inverseDir = boid.position - mousePos;
+                Vector2 escape = Vector2.Zero;
+                if(inverseDir.LengthSquared() > 0)
+                escape = Vector2.Normalize(inverseDir) * maximumBoidSpeed;
 
                 // Forcefully snap 20% of their velocity toward the escape vector instantly this frame
                 boid.velocity = Vector2.Lerp(boid.velocity, escape, 0.2f);
@@ -220,18 +222,20 @@ public class FlockingSim : Simulation
             {
                 // Calculate alignment steering
                 totalVelocity /= neighbors;
-                totalVelocity = Vector2.Normalize(totalVelocity) * maximumBoidSpeed;
+                if(totalVelocity.LengthSquared() > 0)
+                    totalVelocity = Vector2.Normalize(totalVelocity) * maximumBoidSpeed;
 
                 // Calculate cohesion steering
                 totalPositions /= neighbors;
                 Vector2 directionToCenter = totalPositions - boid.position;
-                directionToCenter = Vector2.Normalize(directionToCenter) * maximumBoidSpeed;
+                if(directionToCenter.LengthSquared() > 0)
+                    directionToCenter = Vector2.Normalize(directionToCenter) * maximumBoidSpeed;
 
                 // Calculate separation steering
                 escapeDirection = Vector2.Normalize(escapeDirection) * maximumBoidSpeed;
 
                 Vector2 desiredSteering = (totalVelocity * alignmentWeight) + (directionToCenter * cohesionWeight) + (escapeDirection * separationWeight);
-                if (desiredSteering.Length() > 0)
+                if (desiredSteering.LengthSquared() > 0)
                 {
                     desiredSteering = Vector2.Normalize(desiredSteering) * maximumBoidSpeed;
                     steering += desiredSteering - boid.velocity;
@@ -329,20 +333,20 @@ public class FlockingSim : Simulation
         return $"[SYSTEM]\n" +
            $"FPS             : {Raylib.GetFPS()}\n" +
            $"Screen Space    : {screenWidth}x{screenHeight}\n" +
-           $"Spatial Grid    : {totalRows}x{totalColumns} Cells ({boidPerceptionRadius}px tracking)\n\n" +
+           $"Spatial Grid    : {gridColumns}x{gridRows} Cells ({boidPerceptionRadius}px tracking)\n\n" +
            $"[FLOCK STATUS]\n" +
            $"Population      : {boids.Count:N0} boids\n\n" +
            $"[VARIABLES & COEFFICIENTS]\n" +
-           $"[Up/Down] Alignment : {alignmentWeight:F2}\n" +
-           $"[Left/Right] Cohesion  : {cohesionWeight:F2}\n" +
-           $"[w/s] Separation: {separationWeight:F2}\n" +
-           $"[1/2] Maximum Speed: {maximumBoidSpeed:F2}\n" +
-           $"[3/4] Turning Speed: {maximumSteeringForce:F2}\n\n" +
+           $"[Up/Down] Alignment : {alignmentWeight}\n" +
+           $"[Left/Right] Cohesion  : {cohesionWeight}\n" +
+           $"[w/s] Separation: {separationWeight}\n" +
+           $"[1/2] Maximum Speed: {maximumBoidSpeed}\n" +
+           $"[3/4] Steering Force: {maximumSteeringForce}\n\n" +
            $"[INPUT SUITE]\n" +
-           $"[+/-] Change Preset; Current: {presetName(currentPreset):F2}\n\n" +
+           $"[+/-] Change Preset; Current: {presetName(currentPreset)}\n\n" +
            $"L-Click         : Predator Threat (Scatter)\n" +
-           $"R-Click         : Gravitational Vortex (Orbit)\n" +
+           $"R-Click         : Rotating Force Field\n" +
            $"Key [B]         : Stream Spawning Brush\n" +
-           $"Key [C]         : Flush Flock Memory";
+           $"Key [C]         : Clear Flock";
     }
 }

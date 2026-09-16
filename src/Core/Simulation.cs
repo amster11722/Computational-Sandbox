@@ -2,7 +2,7 @@
 
 using Raylib_cs;
 
-// Core class for rendering
+// Shared lifecycle and diagnostics framework for all simulations
 public abstract class Simulation
 {
 
@@ -17,7 +17,7 @@ public abstract class Simulation
 
         Initialize();
 
-        // Draw loop
+        // Main update/render loop
         while (!Raylib.WindowShouldClose())
         {
             // Runs data-based updates, passing in deltaTime
@@ -30,9 +30,7 @@ public abstract class Simulation
                 debugMenuOpen = !debugMenuOpen;
             if (debugMenuOpen)
             {
-                string data = "";
-                data += AddDebugData();
-                data += "\n\n[TAB] to close or open menu";
+                string data = AddDebugData() + "\n\n[TAB] Toggle diagnostics";
                 DrawTextWithOutline(data, 10, 10, 20, new Color(0, 158, 47), Color.Black, 2);
             }
             Raylib.EndDrawing();

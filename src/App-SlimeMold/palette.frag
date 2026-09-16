@@ -1,7 +1,6 @@
 #version 330
 
 in vec2 fragTexCoord;
-in vec4 fragColor;
 uniform sampler2D texture0;
 uniform float u_time;
 out vec4 finalColor;

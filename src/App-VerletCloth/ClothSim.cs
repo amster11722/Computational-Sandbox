@@ -67,7 +67,7 @@ public class ClothSim : Simulation
         Raylib.SetWindowSize(screenWidth, screenHeight);
         Raylib.ToggleFullscreen();
 
-        // Initiliaze particles and connections
+        // Initialize particles and connections
 
         for (int b = 0; b < 4; b++)
         {
@@ -78,7 +78,7 @@ public class ClothSim : Simulation
         {
             for (int j = 0; j < clothRes; j++)
             {
-                particles.Add(new Particle((float)random.NextDouble() + i * (clothWidth / clothRes) + 550, (float)random.NextDouble() + j * (clothWidth / clothRes) + 50, j == 0));
+                particles.Add(new Particle((float)random.NextDouble() + i * (clothWidth / clothRes) + (screenWidth - clothWidth) / 2f, (float)random.NextDouble() + j * (clothWidth / clothRes) + 50, j == 0));
                 if (j > 0)
                 {
                     Particle topParticle = particles[particles.Count - 2];
@@ -109,7 +109,7 @@ public class ClothSim : Simulation
         }
 
         // Engine warmup to prevent initial chaos
-        settleCloth(150);
+        SettleCloth(150);
     }
 
     protected override void Update(float deltaTime)
@@ -119,7 +119,7 @@ public class ClothSim : Simulation
 
         timeSinceReset += deltaTime;
 
-        int a = 600; // gravity
+        int gravity = 600;
 
         // Apply verlet integration
         for (int i = 0; i < particles.Count; i++)
@@ -128,15 +128,15 @@ public class ClothSim : Simulation
             {
                 Vector2 prev = new Vector2(particles[i].position.X, particles[i].position.Y);
                 particles[i].position.X += (particles[i].position.X - particles[i].prevPosition.X) * 0.999f;
-                particles[i].position.Y += (particles[i].position.Y - particles[i].prevPosition.Y + a * deltaTime * deltaTime) * 0.999f;
+                particles[i].position.Y += (particles[i].position.Y - particles[i].prevPosition.Y + gravity * deltaTime * deltaTime) * 0.999f;
                 particles[i].prevPosition = prev;
             }
         }
 
-        // Apply connection contraints in parallel via multi-stage relaxation
+        // Apply connection constraints in parallel via multi-stage relaxation
         for (int i = 0; i < 15; i++)
         {
-            correctConstraints();
+            CorrectConstraints();
         }
 
         // Cloth interaction
@@ -190,15 +190,15 @@ public class ClothSim : Simulation
             {
                 connection.isActive = true;
             }
-            settleCloth(300);
+            SettleCloth(300);
         }
         if (Raylib.IsKeyDown(KeyboardKey.S))
         {
-            settleCloth(100);
+            SettleCloth(100);
         }
     }
 
-    void settleCloth(int steps)
+    void SettleCloth(int steps)
     {
         float fixedDt = 0.016f;
         int gravity = 600;
@@ -222,12 +222,12 @@ public class ClothSim : Simulation
 
             for (int c = 0; c < 15; c++)
             {
-                correctConstraints();
+                CorrectConstraints();
             }
         }
     }
 
-    public void correctConstraints()
+    public void CorrectConstraints()
     {
         // Pulls constraints back to their resting length. Runs parallel in 4 batches for efficiency
         for (int b = 0; b < 4; b++)
@@ -276,7 +276,7 @@ public class ClothSim : Simulation
                 Particle BL = particles[i * clothRes + j + 1];
                 Particle BR = particles[(i + 1) * clothRes + j + 1];
 
-                // Phong illumination
+                // Orientation-based diffuse shading
 
                 Vector2 surfaceEdge1 = TR.position - TL.position;
                 Vector2 surfaceEdge2 = BL.position - TL.position;
@@ -304,31 +304,10 @@ public class ClothSim : Simulation
 
                 float restLen = (float)clothWidth / clothRes;
 
-                // float strainScale = 180f; // Amplifies structural tension
-                // float speedScale = 20f;   // Amplifies kinetic motion brightness
 
                 // Only draw the first triangle if the top and right boundaries are intact
                 if (topEdgeActive && rightEdgeActive)
                 {
-                    // float strainTop = Math.Abs(Vector2.Distance(TL.position, TR.position) - restLen);
-                    // float strainRight = Math.Abs(Vector2.Distance(TR.position, BR.position) - restLen);
-
-                    float speedTL = (TL.position - TL.prevPosition).Length();
-                    float speedTR = (TR.position - TR.prevPosition).Length();
-                    float speedBR = (BR.position - BR.prevPosition).Length();
-                    // float avgSpeed = (speedTL + speedTR + speedBR) / 3f;
-
-                    // int r = (int)(strainRight * strainScale + avgSpeed * speedScale * 1.5f);
-                    // int g = (int)(avgSpeed * speedScale * 2.0f); // Spikes hard green during cuts
-                    // int b = (int)(130 - (strainTop * strainScale) + avgSpeed * speedScale * 1.2f);
-
-                    // Color color = new Color(
-                    //     (byte)Math.Clamp(r, 25, 255),
-                    //     (byte)Math.Clamp(g, 20, 255),
-                    //     (byte)Math.Clamp(b, 45, 255),
-                    //     (byte)255
-                    // );
-
                     Raylib.DrawTriangle(BR.position, TR.position, TL.position, fabricColor);
                     Raylib.DrawTriangle(TL.position, TR.position, BR.position, fabricColor);
                 }
@@ -336,25 +315,6 @@ public class ClothSim : Simulation
                 // Only draw the second triangle if the bottom and left boundaries are intact
                 if (bottomEdgeActive && leftEdgeActive)
                 {
-                    // float strainLeft = Math.Abs(Vector2.Distance(TL.position, BL.position) - restLen);
-                    // float strainBottom = Math.Abs(Vector2.Distance(BL.position, BR.position) - restLen);
-
-                    float speedTL = (TL.position - TL.prevPosition).Length();
-                    float speedBL = (BL.position - BL.prevPosition).Length();
-                    float speedBR = (BR.position - BR.prevPosition).Length();
-                    // float avgSpeed = (speedTL + speedBL + speedBR) / 3f;
-
-                    // int r = (int)(strainLeft * strainScale + avgSpeed * speedScale * 1.5f);
-                    // int g = (int)(avgSpeed * speedScale * 2.0f);
-                    // int b = (int)(130 - (strainBottom * strainScale) + avgSpeed * speedScale * 1.2f);
-
-                    // Color color = new Color(
-                    //     (byte)Math.Clamp(r, 25, 255),
-                    //     (byte)Math.Clamp(g, 20, 255),
-                    //     (byte)Math.Clamp(b, 45, 255),
-                    //     (byte)255
-                    // );
-
                     Raylib.DrawTriangle(TL.position, BL.position, BR.position, fabricColor);
                     Raylib.DrawTriangle(BR.position, BL.position, TL.position, fabricColor);
                 }

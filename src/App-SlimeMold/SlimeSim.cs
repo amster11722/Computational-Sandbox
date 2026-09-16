@@ -105,7 +105,7 @@ public class SlimeSim : Simulation
     {
         // Set up window
         SlimeSim slimeSim = new SlimeSim();
-        slimeSim.Run(500, 500, "Flocking Simulation");
+        slimeSim.Run(500, 500, "Slime Mold Simulation");
     }
 
     protected override void Initialize()
@@ -117,9 +117,6 @@ public class SlimeSim : Simulation
 
         Raylib.SetWindowSize(screenWidth, screenHeight);
         Raylib.ToggleFullscreen();
-
-        // Initialize pheromone trail map
-        Image blankImage = Raylib.GenImageColor(screenWidth, screenHeight, Color.Black);
 
         pheromones = new Color[canvasWidth * canvasHeight];
         Array.Fill(pheromones, Color.Black);
@@ -145,7 +142,7 @@ public class SlimeSim : Simulation
     protected override void Update(float deltaTime)
     {
         // Pull fresh data
-        VramToCPU(targetB);
+        VramToCpu(targetB);
         // Slime logic, runs in parallel
         Parallel.For(0, populationSize, i =>
         {
@@ -163,9 +160,6 @@ public class SlimeSim : Simulation
                 slimeAgents[i].angle += turnSpeed * deltaTime;
             if (right > left && center < right)
                 slimeAgents[i].angle -= turnSpeed * deltaTime;
-            // Wander if no pheromones in sight, does not work in parallel
-            // if (right == 0 && left == 0 && center == 0)
-            //     slimeAgents[i].angle += (float)(random.NextDouble() * 50 - 25) * deltaTime;
             // Move
             slimeAgents[i].position += new Vector2(MathF.Cos(rot), MathF.Sin(rot)) * moveSpeed * deltaTime;
             // Wrap position
@@ -175,7 +169,7 @@ public class SlimeSim : Simulation
             if (slimeAgents[i].position.Y > canvasHeight) slimeAgents[i].position.Y = 1;
         });
 
-        // Update pheromones to texture
+        // Deposit agent pheromones into the CPU trail buffer
 
         foreach (SlimeAgent agent in slimeAgents)
         {
@@ -221,6 +215,7 @@ public class SlimeSim : Simulation
         {
             fixed (Color* pixel = pheromones)
             {
+                // Upload the updated trail buffer to the GPU
                 Raylib.UpdateTexture(targetA.Texture, pixel);
             }
         }
@@ -246,16 +241,16 @@ public class SlimeSim : Simulation
         return pheromones[clampedX + clampedY * canvasWidth].R;
     }
 
-    void SetPheromoneAt(Color[] list, float x, float y, float value)
+    void SetPheromoneAt(Color[] buffer, float x, float y, float value)
     {
         int clampedX = Math.Clamp((int)MathF.Round(x), 0, canvasWidth - 1);
         int clampedY = Math.Clamp((int)MathF.Round(y), 0, canvasHeight - 1);
         int index = clampedX + clampedY * canvasWidth;
         byte val = (byte)Math.Min(255, value);
-        list[index].R = val;
-        list[index].G = val;
-        list[index].B = val;
-        list[index].A = 255;
+        buffer[index].R = val;
+        buffer[index].G = val;
+        buffer[index].B = val;
+        buffer[index].A = 255;
     }
 
     void AddPheromoneAt(float x, float y, float value)
@@ -263,7 +258,7 @@ public class SlimeSim : Simulation
         SetPheromoneAt(pheromones, x, y, GetPheromoneAt(x, y) + value);
     }
 
-    void VramToCPU(RenderTexture2D source)
+    void VramToCpu(RenderTexture2D source)
     {
         Image gpuImage = Raylib.LoadImageFromTexture(source.Texture);
         unsafe
@@ -303,13 +298,13 @@ public class SlimeSim : Simulation
         return $"[SYSTEM]\n" +
            $"FPS             : {Raylib.GetFPS()}\n" +
            $"Resolution      : {screenWidth}x{screenHeight} (Native)\n" +
-           $"Canvas Target   : {canvasWidth}x{canvasHeight} (Downsampled)\n\n" +
+           $"Trail Buffer   : {canvasWidth}x{canvasHeight}\n\n" +
            $"[SIMULATION]\n" +
            $"Population Size : {populationSize:N0} agents\n" +
-           $"Velocity (Up/Down)  : {moveSpeed:F0} px/s\n" +
-           $"Steering (Left/Right)  : {turnSpeed:F0} rad/s\n" +
-           $"Sensors  (W/S)  : {sensorDistance:F1} px\n\n" +
-           $"[+/-] Change Preset; Current: {presetName(currentPreset):F2}\n\n" +
+           $"Move Speed (Up/Down)  : {moveSpeed:F0} px/s\n" +
+           $"Turn Rate (Left/Right)  : {turnSpeed:F0} rad/s\n" +
+           $"Sensor Distance  (W/S)  : {sensorDistance:F1} px\n\n" +
+           $"[+/-] Change Preset; Current: {presetName(currentPreset)}\n\n" +
            $"[INTERACTION]\n" +
            $"L-Click : Deposit Pheromones\n" +
            $"R-Click : Vacuum/Erase Trails\n";
